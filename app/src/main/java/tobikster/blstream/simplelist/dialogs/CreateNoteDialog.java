@@ -18,8 +18,10 @@ import tobikster.blstream.simplelist.R;
  */
 public class CreateNoteDialog extends DialogFragment {
 	public static final String ARG_EXISTING_NOTE_TITLE = "existing_note_title";
+	public static final String ARG_EDIT_MODE = "edit_mode";
 	private InteractionListener mListener;
 	private String mExistingNoteTitle;
+	private boolean mEditMode;
 
 	public CreateNoteDialog() {
 	}
@@ -32,6 +34,7 @@ public class CreateNoteDialog extends DialogFragment {
 		Bundle args = new Bundle();
 		CreateNoteDialog instance = new CreateNoteDialog();
 		args.putString(ARG_EXISTING_NOTE_TITLE, existingNoteTitle);
+		args.putBoolean(ARG_EDIT_MODE, existingNoteTitle != null);
 		instance.setArguments(args);
 		return instance;
 	}
@@ -52,6 +55,7 @@ public class CreateNoteDialog extends DialogFragment {
 		super.onCreate(savedInstanceState);
 		Bundle args = getArguments();
 		mExistingNoteTitle = args.getString(ARG_EXISTING_NOTE_TITLE);
+		mEditMode = args.getBoolean(ARG_EDIT_MODE, false);
 	}
 
 	@NonNull
@@ -59,26 +63,29 @@ public class CreateNoteDialog extends DialogFragment {
 	public Dialog onCreateDialog(Bundle savedInstanceState) {
 		AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
 		LayoutInflater layoutInflater = getActivity().getLayoutInflater();
+
 		final View view = layoutInflater.inflate(R.layout.dialog_add_note, null);
+
 		((EditText)view.findViewById(R.id.note_title_editor)).setText(mExistingNoteTitle);
+
 		builder.setView(view).setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
 			@Override
 			public void onClick(DialogInterface dialog, int which) {
 				EditText noteTitleEditor = (EditText)view.findViewById(R.id.note_title_editor);
-				mListener.onCreateNoteConfirmed(CreateNoteDialog.this, noteTitleEditor.getText().toString());
+				mListener.onCreateNoteConfirmed(CreateNoteDialog.this, noteTitleEditor.getText().toString(), mEditMode);
 			}
 		}).setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
 			@Override
 			public void onClick(DialogInterface dialog, int which) {
-				mListener.onCreateDialogCanceled(CreateNoteDialog.this);
+				mListener.onCreateDialogCanceled(CreateNoteDialog.this, mEditMode);
 			}
 		});
 		return builder.create();
 	}
 
 	public interface InteractionListener {
-		void onCreateNoteConfirmed(CreateNoteDialog dialog, String noteTitle);
+		void onCreateNoteConfirmed(CreateNoteDialog dialog, String noteTitle, boolean editMode);
 
-		void onCreateDialogCanceled(CreateNoteDialog dialog);
+		void onCreateDialogCanceled(CreateNoteDialog dialog, boolean editMode);
 	}
 }

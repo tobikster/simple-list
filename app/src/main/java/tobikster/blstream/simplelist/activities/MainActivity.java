@@ -7,7 +7,6 @@ import android.widget.Toast;
 import tobikster.blstream.simplelist.R;
 import tobikster.blstream.simplelist.dialogs.CreateNoteDialog;
 import tobikster.blstream.simplelist.fragments.NotesListFragment;
-import tobikster.blstream.simplelist.model.Note;
 
 public class MainActivity extends AppCompatActivity implements CreateNoteDialog.InteractionListener {
 
@@ -25,18 +24,32 @@ public class MainActivity extends AppCompatActivity implements CreateNoteDialog.
 	}
 
 	@Override
-	public void onCreateNoteConfirmed(CreateNoteDialog dialog, String noteTitle) {
+	public void onCreateNoteConfirmed(CreateNoteDialog dialog, String noteTitle, boolean editMode) {
+//		if(noteTitle.equals("")) {
+//			Toast.makeText(this, R.string.alert_note_empty, Toast.LENGTH_LONG).show();
+//		}
+//		else {
+//			mNotesListFragment.addOrModifyNote(noteTitle);
+//			dialog.dismiss();
+//		}
 		if(noteTitle.equals("")) {
 			Toast.makeText(this, R.string.alert_note_empty, Toast.LENGTH_LONG).show();
 		}
 		else {
-			mNotesListFragment.addOrModifyNote(noteTitle);
-			dialog.dismiss();
+			if(editMode) {
+				mNotesListFragment.editNote(noteTitle);
+			}
+			else {
+				mNotesListFragment.addNote(noteTitle);
+			}
 		}
 	}
 
 	@Override
-	public void onCreateDialogCanceled(CreateNoteDialog dialog) {
+	public void onCreateDialogCanceled(CreateNoteDialog dialog, boolean editMode) {
+		if(editMode) {
+			mNotesListFragment.cancelEditNote();
+		}
 		dialog.dismiss();
 	}
 }

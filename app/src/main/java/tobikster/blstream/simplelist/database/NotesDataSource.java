@@ -52,6 +52,29 @@ public class NotesDataSource {
 		return note;
 	}
 
+	public Note createNote(Note note) {
+		ContentValues values = new ContentValues();
+		values.put(NotesContract.NotesEntry.COLUMN_NAME_NOTE_TITLE, note.getTitle());
+		values.put(NotesContract.NotesEntry.COLUMN_NAME_NOTE_CHECKED, note.isChecked() ? 1 : 0);
+
+		long id = mDatabase.insert(NotesContract.NotesEntry.TABLE_NAME, null, values);
+
+		Cursor cursor = mDatabase.query(NotesContract.NotesEntry.TABLE_NAME, ALL_COLUMNS, NotesContract.NotesEntry._ID + " = " + id, null, null, null, null);
+		cursor.moveToFirst();
+		note = cursorToNote(cursor);
+		cursor.close();
+		return note;
+	}
+
+	public Note modifyNote(Note note) {
+		ContentValues values = new ContentValues();
+		values.put(NotesContract.NotesEntry.COLUMN_NAME_NOTE_TITLE, note.getTitle());
+		values.put(NotesContract.NotesEntry.COLUMN_NAME_NOTE_CHECKED, note.isChecked() ? 1 : 0);
+
+		mDatabase.update(NotesContract.NotesEntry.TABLE_NAME, values, NotesContract.NotesEntry._ID + " = " + note.getId(), null);
+		return note;
+	}
+
 	public void deleteNote(Note note) {
 		long id = note.getId();
 		mDatabase.delete(NotesContract.NotesEntry.TABLE_NAME, NotesContract.NotesEntry._ID + " = " + id, null);

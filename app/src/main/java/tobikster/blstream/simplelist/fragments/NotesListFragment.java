@@ -2,12 +2,12 @@ package tobikster.blstream.simplelist.fragments;
 
 
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
 import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
+import android.util.SparseBooleanArray;
 import android.view.ActionMode;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -15,11 +15,10 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CompoundButton;
+import android.widget.AbsListView;
+import android.widget.AdapterView;
+import android.widget.ListView;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import tobikster.blstream.simplelist.R;
@@ -31,37 +30,33 @@ import tobikster.blstream.simplelist.model.Note;
 /**
  * A simple {@link Fragment} subclass.
  */
-public class NotesListFragment extends Fragment implements SearchView.OnQueryTextListener, NotesListAdapter.NoteViewHolder.OnInteractionListener, ActionMode.Callback {
+public class NotesListFragment extends Fragment implements SearchView.OnQueryTextListener, AbsListView.MultiChoiceModeListener, AdapterView.OnItemLongClickListener, NotesListAdapter.OnItemInteractionListener {
 
-	@SuppressWarnings("unused")
-	public static final String LOGCAT_TAG = "NotesListFragment";
-
-	private RecyclerView mRecyclerView;
+	public static final String LOGCAT_TAG = "NotesListFragment2";
+	private ListView mListView;
 	private FloatingActionButton mAddNoteFAB;
-	private NotesListAdapter mAdapter;
-	private List<Note> mNotes;
-	private String mActualQuery;
-	private ActionMode mActionMode;
 	private NotesDataSource mNotesDataSource;
+	private List<Note> mNotes;
+	private NotesListAdapter mAdapter;
+	private ActionMode mActionMode;
 	private Note mEditedNote;
 
-	public NotesListFragment() {
-		// Required empty public constructor
-	}
-
 	public static NotesListFragment newInstance() {
-		NotesListFragment newInstance = new NotesListFragment();
-		newInstance.mActualQuery = "";
-		newInstance.mActionMode = null;
-		newInstance.mEditedNote = null;
-		return newInstance;
+		return new NotesListFragment();
 	}
 
+	@Override
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		mEditedNote = null;
+	}
+
+	@Nullable
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		final View view = inflater.inflate(R.layout.fragment_notes_list, container, false);
 
-		mRecyclerView = (RecyclerView)view.findViewById(R.id.recycler_view);
+		mListView = (ListView)view.findViewById(R.id.list_view);
 		mAddNoteFAB = (FloatingActionButton)view.findViewById(R.id.add_note_fab);
 
 		mNotesDataSource = new NotesDataSource(getActivity());
@@ -72,14 +67,15 @@ public class NotesListFragment extends Fragment implements SearchView.OnQueryTex
 	}
 
 	@Override
-	public void onViewCreated(View view, Bundle savedInstanceState) {
+	public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 		setHasOptionsMenu(true);
 
-		mRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
-
 		mAdapter = new NotesListAdapter(getActivity(), mNotes, this);
-		mRecyclerView.setAdapter(mAdapter);
+		mListView.setAdapter(mAdapter);
+		mListView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+		mListView.setMultiChoiceModeListener(this);
+		mListView.setOnItemLongClickListener(this);
 
 		mAddNoteFAB.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -117,119 +113,67 @@ public class NotesListFragment extends Fragment implements SearchView.OnQueryTex
 
 	@Override
 	public boolean onQueryTextChange(String query) {
-		mActualQuery = query;
-		final List<Note> filteredNotesList = filter(mNotes);
-		mAdapter.animateTo(filteredNotesList);
-		mRecyclerView.scrollToPosition(0);
+		mAdapter.getFilter().filter(query);
 		return true;
 	}
 
-	private List<Note> filter(List<Note> notes) {
-		String query = mActualQuery.toLowerCase();
-		final List<Note> filteredNotesList = new ArrayList<>();
-		for(Note note : notes) {
-			final String title = note.getTitle().toLowerCase();
-			if(title.contains(query)) {
-				filteredNotesList.add(note);
-			}
-		}
-		return filteredNotesList;
+	public void addNote(String noteTitle) {
+		Note note = new Note(noteTitle);
+		note = mNotesDataSource.createNote(note);
+		mAdapter.addNote(note);
 	}
 
-	public void addOrModifyNote(String noteTitle) {
-		Note note = new Note(noteTitle);
-		if(mEditedNote != null) {
-			note.setId(mEditedNote.getId());
-			note.setChecked(mEditedNote.isChecked());
-		}
-		Note newNote = mNotesDataSource.createOrModifyNote(note);
-		if(mEditedNote == null) {
-			mNotes.add(newNote);
-		}
-		else{
-			int index = mNotes.indexOf(newNote);
-			mNotes.remove(index);
-			mNotes.add(index, newNote);
-		}
-		if(newNote.getTitle().toLowerCase().contains(mActualQuery.toLowerCase())) {
-			mAdapter.updateItems(newNote);
-		}
+	public void editNote(String noteTitle) {
+		mEditedNote.setTitle( noteTitle);
+		Note note = mNotesDataSource.modifyNote(mEditedNote);
+		mAdapter.modifyNote(note);
 		mEditedNote = null;
 	}
 
-	public void removeNote(Note note) {
-		mNotesDataSource.deleteNote(note);
-		mNotes.remove(note);
-	}
-
 	@Override
-	public void onItemClicked(View view, int position) {
-		selectOrDeselectItem(position);
-	}
-
-	@Override
-	public boolean onItemLongClicked(View view, int position) {
-		if(mActionMode == null) {
-			mActionMode = getActivity().startActionMode(this);
-			selectOrDeselectItem(position);
-		}
-		return true;
-	}
-
-	@Override
-	public void onItemCheckboxChanged(CompoundButton v, int position, boolean state) {
-		Note note = mAdapter.getItem(position);
-		note.setChecked(state);
-		mNotesDataSource.createOrModifyNote(note);
-	}
-
-	private void selectOrDeselectItem(int position) {
-		if(mActionMode != null) {
-			mAdapter.toggleSelection(position);
-			if(mAdapter.getSelectedItemsCount() == 0) {
-				mActionMode.finish();
-			}
-			else {
-				mActionMode.invalidate();
-			}
-		}
+	public void onItemCheckedStateChanged(ActionMode mode, int position, long id, boolean checked) {
+		mode.setTitle(Integer.toString(mListView.getCheckedItemCount()));
 	}
 
 	@Override
 	public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-		MenuInflater menuInflater = mode.getMenuInflater();
-		menuInflater.inflate(R.menu.note_context_menu, menu);
+		mode.getMenuInflater().inflate(R.menu.note_context_menu, menu);
 		return true;
 	}
 
 	@Override
 	public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-		menu.findItem(R.id.action_modify_note).setEnabled(!(mAdapter.getSelectedItemsCount() > 1));
+		menu.findItem(R.id.action_modify_note).setEnabled(!(mListView.getCheckedItemCount() > 1));
 		return true;
 	}
 
 	@Override
 	public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-		boolean eventConsumed = false;
+		boolean eventConsumed  = false;
 		switch(item.getItemId()) {
 			case R.id.action_modify_note:
-				mEditedNote = mAdapter.getItem(mAdapter.getSelectedItems().get(0));
-				CreateNoteDialog.newInstance(mEditedNote.getTitle()).show(getActivity().getSupportFragmentManager(), "edit_note");
+				if(mListView.getCheckedItemCount() == 1) {
+					SparseBooleanArray checkedItems = mListView.getCheckedItemPositions();
+					for(int i = 0; mEditedNote == null && i < mAdapter.getCount(); ++i) {
+						if(checkedItems.get(i, false)) {
+							mEditedNote = mAdapter.getItem(i);
+						}
+					}
+					if(mEditedNote != null) {
+						CreateNoteDialog.newInstance(mEditedNote.getTitle()).show(getFragmentManager(), "editNoteDialog");
+					}
+				}
 				mode.finish();
 				eventConsumed = true;
 				break;
 
 			case R.id.action_delete_note:
-				List<Integer> selectedItems = mAdapter.getSelectedItems();
-				Collections.sort(selectedItems, new Comparator<Integer>() {
-					@Override
-					public int compare(Integer lhs, Integer rhs) {
-						return rhs - lhs;
+				SparseBooleanArray checkedItems = mListView.getCheckedItemPositions();
+				for(int i = mAdapter.getCount() - 1; i >= 0; --i) {
+					if(checkedItems.get(i, false)) {
+						Note note = mAdapter.removeNote(i);
+						mNotesDataSource.deleteNote(note);
 					}
-				});
-				for(int selectedNotePosition : selectedItems) {
-					Note removedNote = mAdapter.removeItem(selectedNotePosition);
-					removeNote(removedNote);
 				}
 				mode.finish();
 				eventConsumed = true;
@@ -240,7 +184,35 @@ public class NotesListFragment extends Fragment implements SearchView.OnQueryTex
 
 	@Override
 	public void onDestroyActionMode(ActionMode mode) {
+		mListView.clearChoices();
+		for(int i = 0; i < mListView.getCount(); ++i) {
+			mListView.setItemChecked(i, false);
+		}
 		mActionMode = null;
-		mAdapter.clearSelections();
+	}
+
+	@Override
+	public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+		if(mActionMode == null) {
+			mActionMode = getActivity().startActionMode(this);
+		}
+		mListView.setItemChecked(position, !mListView.isItemChecked(position));
+		mActionMode.invalidate();
+		if(mListView.getCheckedItemCount() == 0) {
+			mActionMode.finish();
+		}
+		return true;
+	}
+
+	@Override
+	public void onItemCheckboxStateChanged(int position, boolean state) {
+		Note note = mAdapter.getItem(position);
+		note.setChecked(state);
+		mNotesDataSource.modifyNote(note);
+		mAdapter.notifyDataSetChanged();
+	}
+
+	public void cancelEditNote() {
+		mEditedNote = null;
 	}
 }

@@ -1,13 +1,15 @@
 package tobikster.blstream.simplelist.adapters;
 
 import android.content.Context;
-import android.support.v7.widget.RecyclerView;
-import android.util.SparseBooleanArray;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -17,183 +19,123 @@ import tobikster.blstream.simplelist.R;
 import tobikster.blstream.simplelist.model.Note;
 
 /**
- * Created by tobikster on 2015-10-21.
+ * Created by tobikster on 2015-10-22.
  */
-public class NotesListAdapter extends RecyclerView.Adapter<NotesListAdapter.NoteViewHolder> {
+public class NotesListAdapter extends BaseAdapter implements Filterable {
 
-	private final LayoutInflater mLayoutInflater;
-	private final List<Note> mNotes;
-	private NoteViewHolder.OnInteractionListener mOnInteractionListener;
-	private SparseBooleanArray mSelectedItems;
+	private LayoutInflater mInflater;
+	private List<Note> mNotes;
+	private List<Note> mFilteredNotes;
+	private String mCurrentFilterQuery;
+	private OnItemInteractionListener mOnItemInteractionListener;
 
-	public NotesListAdapter(Context context, List<Note> notes, NoteViewHolder.OnInteractionListener onInteractionListener) {
-		mLayoutInflater = LayoutInflater.from(context);
+	public NotesListAdapter(Context context, List<Note> notes, OnItemInteractionListener onItemInteractionListener) {
+		mInflater = LayoutInflater.from(context);
 		mNotes = new ArrayList<>(notes);
-		mOnInteractionListener = onInteractionListener;
-		mSelectedItems = new SparseBooleanArray();
+		mFilteredNotes = new ArrayList<>(mNotes);
+		mCurrentFilterQuery = "";
+		mOnItemInteractionListener = onItemInteractionListener;
 	}
 
 	@Override
-	public NoteViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-		final View itemView = mLayoutInflater.inflate(R.layout.notes_list_item, parent, false);
-		return new NoteViewHolder(itemView, mOnInteractionListener);
+	public int getCount() {
+		return mFilteredNotes.size();
 	}
 
 	@Override
-	public void onBindViewHolder(NoteViewHolder holder, int position) {
-		final Note note = mNotes.get(position);
-		holder.bind(note);
+	public Note getItem(int position) {
+		return mFilteredNotes.get(position);
 	}
 
 	@Override
-	public int getItemCount() {
-		return mNotes.size();
+	public long getItemId(int position) {
+		return position;
 	}
 
-	public void animateTo(List<Note> notes) {
-		applyAndAnimateRemovals(notes);
-		applyAndAnimateAdditions(notes);
-		applyAndAnimateMovedItems(notes);
-	}
-
-	private void applyAndAnimateRemovals(List<Note> newNotes) {
-		for(int i = mNotes.size() - 1; i >= 0; i--) {
-			final Note note = mNotes.get(i);
-			if(!newNotes.contains(note)) {
-				removeItem(i);
-			}
+	@Override
+	public View getView(final int position, View convertView, ViewGroup parent) {
+		Note note = getItem(position);
+		ViewHolder viewHolder;
+		if(convertView == null) {
+			convertView = mInflater.inflate(R.layout.notes_list_item, parent, false);
+			viewHolder = new ViewHolder();
+			viewHolder.noteTitle = (TextView)convertView.findViewById(R.id.note_title);
+			viewHolder.noteCheckbox = (CheckBox)convertView.findViewById(R.id.note_check_box);
+			convertView.setTag(viewHolder);
 		}
-	}
-
-	private void applyAndAnimateAdditions(List<Note> newNotes) {
-		for(int i = 0, count = newNotes.size(); i < count; i++) {
-			final Note note = newNotes.get(i);
-			if(!mNotes.contains(note)) {
-				addItem(i, note);
-			}
+		else {
+			viewHolder = (ViewHolder)convertView.getTag();
 		}
-	}
 
-	private void applyAndAnimateMovedItems(List<Note> newNotes) {
-		for(int toPosition = newNotes.size() - 1; toPosition >= 0; toPosition--) {
-			final Note note = newNotes.get(toPosition);
-			final int fromPosition = mNotes.indexOf(note);
-			if(fromPosition >= 0 && fromPosition != toPosition) {
-				moveItem(fromPosition, toPosition);
+		viewHolder.noteTitle.setText(note.getTitle());
+		viewHolder.noteCheckbox.setChecked(note.isChecked());
+		viewHolder.noteCheckbox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				if(mOnItemInteractionListener != null) {
+					mOnItemInteractionListener.onItemCheckboxStateChanged(position, isChecked);
+				}
 			}
-		}
+		});
+
+		return convertView;
 	}
 
-	public Note removeItem(int position) {
-		final Note note = mNotes.remove(position);
-		notifyItemRemoved(position);
+	@Override
+	public Filter getFilter() {
+		return new Filter() {
+			@Override
+			protected FilterResults performFiltering(CharSequence constraint) {
+				FilterResults results = new FilterResults();
+
+				mCurrentFilterQuery = constraint.toString().toLowerCase();
+
+				List<Note> filteredList = new ArrayList<>();
+				for(Note note : mNotes) {
+					if(note.getTitle().toLowerCase().contains(mCurrentFilterQuery)) {
+						filteredList.add(note);
+					}
+				}
+				results.count = filteredList.size();
+				results.values = filteredList;
+				return results;
+			}
+
+			@Override
+			protected void publishResults(CharSequence constraint, FilterResults results) {
+				//noinspection unchecked
+				mFilteredNotes = (List<Note>)results.values;
+				notifyDataSetChanged();
+			}
+		};
+	}
+
+	public void addNote(Note note) {
+		mNotes.add(note);
+		getFilter().filter(mCurrentFilterQuery);
+	}
+
+	public void modifyNote(Note note) {
+		int index = mNotes.indexOf(note);
+		Note oldNote = mNotes.get(index);
+		oldNote.setTitle(note.getTitle());
+		oldNote.setChecked(note.isChecked());
+		getFilter().filter(mCurrentFilterQuery);
+	}
+
+	public Note removeNote(int position) {
+		Note note = getItem(position);
+		mNotes.remove(position);
+		getFilter().filter(mCurrentFilterQuery);
 		return note;
 	}
 
-	public void addItem(int position, Note note) {
-		mNotes.add(position, note);
-		notifyItemInserted(position);
+	private static class ViewHolder {
+		public TextView noteTitle;
+		public CheckBox noteCheckbox;
 	}
 
-	public void updateItems(Note note) {
-		int index = mNotes.indexOf(note);
-		if(index >= 0) {
-			Note tmp = mNotes.get(index);
-			tmp.setTitle(note.getTitle());
-			tmp.setChecked(note.isChecked());
-			notifyItemChanged(index);
-		}
-		else {
-			addItem(mNotes.size(), note);
-		}
-	}
-
-	public void moveItem(int fromPosition, int toPosition) {
-		final Note note = mNotes.remove(fromPosition);
-		mNotes.add(toPosition, note);
-		notifyItemMoved(fromPosition, toPosition);
-	}
-
-	public Note getItem(int position) {
-		return mNotes.get(position);
-	}
-
-	public void toggleSelection(int position) {
-		if(mSelectedItems.get(position, false)) {
-			mSelectedItems.delete(position);
-		}
-		else {
-			mSelectedItems.put(position, true);
-		}
-		notifyItemChanged(position);
-	}
-
-	public void clearSelections() {
-		mSelectedItems.clear();
-		notifyDataSetChanged();
-	}
-
-	public int getSelectedItemsCount() {
-		return mSelectedItems.size();
-	}
-
-	public List<Integer> getSelectedItems() {
-		List<Integer> items = new ArrayList<>(mSelectedItems.size());
-		for(int i = 0; i < mSelectedItems.size(); ++i) {
-			items.add(mSelectedItems.keyAt(i));
-		}
-		return items;
-	}
-
-	public static class NoteViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener, CompoundButton.OnCheckedChangeListener {
-
-		private final TextView mNoteTitle;
-		private final CheckBox mNoteCheckbox;
-		private OnInteractionListener mOnInteractionListener;
-
-		public NoteViewHolder(View itemView, OnInteractionListener listener) {
-			super(itemView);
-
-			mNoteTitle = (TextView)itemView.findViewById(R.id.note_title);
-			mNoteCheckbox = (CheckBox)itemView.findViewById(R.id.checkBox);
-			mOnInteractionListener = listener;
-			itemView.setOnClickListener(this);
-			itemView.setOnLongClickListener(this);
-			mNoteCheckbox.setOnCheckedChangeListener(this);
-		}
-
-		public void bind(Note note) {
-			mNoteTitle.setText(note.getTitle());
-			mNoteCheckbox.setChecked(note.isChecked());
-		}
-
-		@Override
-		public void onClick(View v) {
-			if(mOnInteractionListener != null) {
-				mOnInteractionListener.onItemClicked(v, getAdapterPosition());
-			}
-		}
-
-		@Override
-		public boolean onLongClick(View v) {
-			boolean result = false;
-			if(mOnInteractionListener != null) {
-				result = mOnInteractionListener.onItemLongClicked(v, getAdapterPosition());
-			}
-			return result;
-		}
-
-		@Override
-		public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-			if(mOnInteractionListener != null) {
-				mOnInteractionListener.onItemCheckboxChanged(buttonView, getAdapterPosition(), isChecked);
-			}
-		}
-
-		public interface OnInteractionListener {
-			void onItemClicked(View view, int position);
-			boolean onItemLongClicked(View view, int position);
-			void onItemCheckboxChanged(CompoundButton v, int position, boolean state);
-		}
+	public interface OnItemInteractionListener {
+		void onItemCheckboxStateChanged(int position, boolean state);
 	}
 }
