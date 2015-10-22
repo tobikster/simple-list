@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">SimpleList</string>
+    <string name="action_search">Search</string>
+    <string name="hint_add_note">Add note</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="alert_note_empty">Note title cannot be empty!</string>
+    <string name="action_modify">modify</string>
+    <string name="action_delete">delete</string>
+</resources>
