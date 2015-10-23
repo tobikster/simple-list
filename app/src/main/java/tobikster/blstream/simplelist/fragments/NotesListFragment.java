@@ -32,6 +32,7 @@ import tobikster.blstream.simplelist.model.Note;
  */
 public class NotesListFragment extends Fragment implements SearchView.OnQueryTextListener, AbsListView.MultiChoiceModeListener, AdapterView.OnItemLongClickListener, NotesListAdapter.OnItemInteractionListener {
 
+	@SuppressWarnings("unused")
 	public static final String LOGCAT_TAG = "NotesListFragment2";
 	private ListView mListView;
 	private FloatingActionButton mAddNoteFAB;
