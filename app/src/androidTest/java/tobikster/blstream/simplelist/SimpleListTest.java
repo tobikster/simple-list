@@ -31,5 +31,7 @@ public class SimpleListTest extends InstrumentationTestCase {
 		mDevice.findObject(new UiSelector().descriptionContains("internet")).click();
 		gridView.scrollTextIntoView("lokomo");
 		gridView.getChildByText(new UiSelector().className("android.widget.TextView"), "lokomo").clickAndWaitForNewWindow();
+
+		mDevice.findObject(new UiSelector().resourceId("pl.lokomo:id/activity_start__search_circle")).click();
 	}
 }
